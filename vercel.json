@@ -1,0 +1,35 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "builds": [
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "api/dialogue.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/generate.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "^/api/generate/?$",
+      "dest": "/api/generate.js"
+    },
+    {
+      "src": "^/api/dialogue/?$",
+      "dest": "/api/dialogue.js"
+    },
+    {
+      "src": "^/$",
+      "dest": "/index.html"
+    },
+    {
+      "handle": "filesystem"
+    }
+  ]
+}

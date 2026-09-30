@@ -1,0 +1,22 @@
+{
+  "name": "planny8-on-demand",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "verify": "node scripts/verify-deploy.mjs",
+    "vercel-build": "node scripts/verify-deploy.mjs",
+    "test": "node --test test/*.test.js",
+    "test:browser": "node test/browser.mjs",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "openai": "^7.23.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}
