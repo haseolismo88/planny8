@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const read=name=>fs.readFileSync(path.join(root,name),'utf8');
+const cfg=JSON.parse(read('vercel.json'));
+assert.ok(!cfg.functions,'Do not combine functions patterns with the explicit builds configuration.');
+assert.deepEqual(cfg.builds.map(b=>[b.src,b.use]),[['index.html','@vercel/static'],['api/dialogue.js','@vercel/node'],['api/generate.js','@vercel/node']]);
+for(const builder of cfg.builds)assert.ok(fs.statSync(path.join(root,builder.src)).isFile(),`Missing ${builder.src}. Upload the whole project folder, including api/.`);
+const apiRoute=cfg.routes.find(r=>r.dest==='/api/generate.js');
+assert.ok(apiRoute&&new RegExp(apiRoute.src).test('/api/generate'),'API route missing');
+const html=read('index.html');
+assert.ok(html.includes("fetch('/api/generate'"),'Frontend API URL does not match the deployed route');
+for(const [,source]of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g))new Function(source);
+const {default:handler,config}=await import('../api/generate.js');
+assert.equal(typeof handler,'function');assert.equal(config.maxDuration,120);
+console.log('Deployment layout verified: index.html + /api/generate, Node.js function, 120-second limit.');
+import {spawnSync} from 'node:child_process';
+const pkg=JSON.parse(read('package.json'));
+assert.equal(pkg.type,'module');assert.ok(pkg.dependencies.openai);
+assert.ok(!/sk-(?:proj-)?[A-Za-z0-9_-]{16,}/.test(html),'Secret-like string in HTML');
+assert.ok(!html.includes('process.env.OPENAI_API_KEY'),'Server environment reference in client');
+assert.ok(!html.includes('api.openai.com'),'Browser must call only same-origin API');
+const {default:legacy}=await import('../api/dialogue.js');assert.equal(legacy,handler);
+for(const route of ['/api/generate','/api/dialogue'])assert.ok(cfg.routes.some(r=>r.dest&&new RegExp(r.src).test(route)),`Missing ${route}`);
+for(const folder of ['api','scripts','test'])for(const name of fs.readdirSync(path.join(root,folder))){if(!/\.m?js$/.test(name))continue;const file=path.join(root,folder,name);const result=spawnSync(process.execPath,['--check',file],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);}
+console.log('All JavaScript syntax, legacy route, SDK dependency and client secret-boundary checks passed.');
