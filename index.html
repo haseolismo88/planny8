@@ -2490,9 +2490,12 @@ Ringkasan ciri dan kegunaan|Ringkasan masalah dan pilihan|Ringkasan kesesuaian u
         const parts=context.parts.map((part,i)=>({...part,dialogue:lines[i],wordCount:aiWords(lines[i]),note:source==='openai'?'Dijana OpenAI · disemak 15–23 perkataan':'Templat tempatan · bukan OpenAI',video:part.video.replaceAll('__PLANNY_AI_DIALOGUE__',()=>lines[i]).replace(/DIALOGUE WORD COUNT: \d+ words/g,'DIALOGUE WORD COUNT: '+aiWords(lines[i])+' words')}));
         return {...context,source,parts,image:parts.map(t=>`PART ${t.number} · ${t.start}–${t.end}s\n${t.image}`).join('\n\n================\n\n'),video:parts.map(t=>`PART ${t.number} · ${t.start}–${t.end}s\n${t.video}`).join('\n\n================\n\n')};
       }
-      async function aiRequest(product,contexts,avoid,regenerate=false){
+      function campaignMessages(ideas){
+        return ideas.filter(idea=>idea?.source==='openai').map(idea=>({angle:String(idea.angle||'').slice(0,160),message:idea.parts.map(part=>part.dialogue).join(' ').slice(0,360)})).slice(-120);
+      }
+      async function aiRequest(product,contexts,avoid,regenerate=false,previousMessages=[]){
         if(location.protocol==='file:')throw Error('Buka laman yang telah deploy di Vercel untuk menggunakan OpenAI.');
-        const response=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(115000),body:JSON.stringify({product,regenerate,ideas:contexts.map(c=>({id:c.variationId,day:c.day,ideaNumber:c.slot,storyline:c.flow,angle:c.angle,style:c.style,voice:c.voice,duration:c.duration,engine:c.engine,parts:c.parts.map(p=>({scene:p.scene,stage:p.stage}))})),avoid})});
+        const response=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(115000),body:JSON.stringify({product,regenerate,ideas:contexts.map(c=>({id:c.variationId,day:c.day,ideaNumber:c.slot,storyline:c.flow,angle:c.angle,style:c.style,voice:c.voice,duration:c.duration,engine:c.engine,parts:c.parts.map(p=>({scene:p.scene,stage:p.stage}))})),avoid,previousMessages})});
         let data;try{data=await response.json();}catch{throw Error('API Vercel belum tersedia. Pastikan folder api turut dideploy.');}
         if(!response.ok){console.warn('planny.generate.failed',{status:response.status,code:data.code});throw Object.assign(Error([data.code,typeof data.error==='string'&&data.error||aiErrors[data.code]||aiErrors.OPENAI_UNAVAILABLE].filter(Boolean).join(': ')),{code:data.code});}
         if(data.success!==true||data.source!=='openai')throw Error('Format jawapan AI tidak sah. Cuba semula.');
@@ -2557,8 +2560,8 @@ Ringkasan ciri dan kegunaan|Ringkasan masalah dan pilihan|Ringkasan kesesuaian u
         const contexts=needed.map(i=>ideas[i].__context);
         if(contexts.some(x=>!x))throw Error('Sila bina semula rangka produk ini.');
         aiStatus.textContent='AI sedang menulis '+needed.length+' idea…';
-        const avoid=regenerate?needed.flatMap(i=>ideas[i].parts.map(p=>p.dialogue)):[];
-        const data=await aiRequest(product,contexts,avoid,regenerate);
+        const avoid=ideas.filter(idea=>idea.source==='openai').flatMap(idea=>idea.parts.map(p=>p.dialogue)).slice(-120);
+        const data=await aiRequest(product,contexts,avoid,regenerate,campaignMessages(ideas));
         if(!Array.isArray(data.ideas)||data.ideas.length!==contexts.length)throw Error('Jawapan AI tidak lengkap.');
         data.ideas.forEach((row,j)=>{if(row.id!==contexts[j].variationId||row.dialogues.length!==contexts[j].parts.length||!row.dialogues.every(aiValidDialogue))throw Error('Format AI tidak sah.');});
         data.ideas.forEach((row,j)=>{ideas[needed[j]]={...aiFill(contexts[j],row.dialogues),__context:contexts[j]};});
@@ -2602,8 +2605,9 @@ Ringkasan ciri dan kegunaan|Ringkasan masalah dan pilihan|Ringkasan kesesuaian u
       async function creatorGenerate(product,contexts,regenerate=false){
         if(JSON.stringify(state.product)!==JSON.stringify(product))return;
         contexts=contexts.filter(c=>regenerate||!state.dialogues?.[c.variationId-1]);if(!contexts.length)return;
-        const avoid=regenerate?contexts.flatMap(c=>state.dialogues?.[c.variationId-1]||[]):[];
-        const data=await aiRequest(product,contexts,avoid,regenerate);
+        const previous=Object.entries(state.dialogues||{}).map(([index,lines])=>({source:'openai',angle:makeIdea(Number(index)).angle,parts:lines.map(dialogue=>({dialogue}))}));
+        const avoid=previous.flatMap(idea=>idea.parts.map(p=>p.dialogue)).slice(-120);
+        const data=await aiRequest(product,contexts,avoid,regenerate,campaignMessages(previous));
         if(data.ideas?.length!==contexts.length||data.ideas.some((r,i)=>r.id!==contexts[i].variationId||r.dialogues?.length!==4||!r.dialogues.every(aiValidDialogue)))throw Error('Dialog AI tidak lengkap.');
         if(JSON.stringify(state.product)!==JSON.stringify(product))return;
         state.dialogues||={};data.ideas.forEach(row=>{state.dialogues[row.id-1]=row.dialogues;});state.dialogueStatus='Dialog hari dibuka telah siap';save();

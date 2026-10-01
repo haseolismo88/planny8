@@ -56,6 +56,20 @@ test('real official SDK serializes the Responses API request and parses its resp
 });
 
 const makeLine=(n,id=1)=>Array.from({length:n},(_,i)=>i===0?'idea'+id:'kata'+i).join(' ');
+test('campaign message history reaches AI and survives repair without unbounded payloads',async()=>{
+ const key=process.env.OPENAI_API_KEY;process.env.OPENAI_API_KEY='test-only';
+ try{
+  const previousMessages=[{angle:'Rutin pagi',message:'Mesej video semalam.'}];let calls=0;
+  const fn=fake(async request=>{
+   const input=JSON.parse(request.input);assert.deepEqual(input.previousMessages,previousMessages);
+   calls++;return {status:'completed',output_text:JSON.stringify({ideas:[{id:1,dialogues:[calls===1?'Pendek':line]}]})};
+  });
+  const result=await run(fn,{body:{...body,previousMessages}});assert.equal(result.code,200);assert.equal(calls,2);
+  const input=validate({...body,previousMessages:Array.from({length:130},()=>({angle:'a'.repeat(200),message:'b'.repeat(500)}))});
+  assert.equal(input.previousMessages.length,120);assert.equal(input.previousMessages[0].angle.length,160);assert.equal(input.previousMessages[0].message.length,360);
+  assert.deepEqual(validate({...body,previousMessages:[null,{angle:1,message:2}]}).previousMessages,[]);
+ }finally{if(key===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=key;}
+});
 test('accept 15–23 words and reject 14/24, nonstrings and exact duplicates',()=>{
  const input=validate(body);
  for(const n of [14,15,16,17,18,19,20,21,22,23,24])assert.equal(checkOutput({ideas:[{id:1,dialogues:[makeLine(n)]}]},input)===null,n>=15&&n<=23);
