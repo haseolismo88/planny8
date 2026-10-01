@@ -808,6 +808,63 @@ body.simple-products{background:#fff}.simple-products .app{width:min(calc(100% -
         return h >>> 0;
       }
 
+      // One shuffled, persistent set of 120 narrative angles per product campaign.
+      const MARKETING_ANGLES_120 = `
+Masalah kecil yang selalu diabaikan|Punca rutin terasa leceh|Keperluan yang baru disedari|Situasi bila masalah muncul
+Satu manfaat paling relevan|Manfaat dalam rutin harian|Manfaat untuk sasaran produk|Manfaat berbanding ciri
+Kenali satu ciri utama|Detail yang patut diperhatikan|Ciri dan kegunaan sebenar|Apa yang membuat produk ini berbeza
+Panduan untuk pengguna pertama|Cara mula mengikut maklumat produk|Persediaan sebelum menggunakan|Perkara yang perlu disemak dahulu
+Soalan sebelum membeli|Beli ikut keperluan sendiri|Senarai semak kesesuaian|Bila produk ini mungkin tidak sesuai
+Nilai berbanding harga dinyatakan|Bajet dan keutamaan pembeli|Apa yang termasuk dalam tawaran|Pertimbangkan nilai kegunaan
+Rutin pagi sasaran pengguna|Rutin selepas selesai kerja|Persediaan sebelum keluar|Waktu berehat di rumah
+Produk dalam situasi sebenar|Bayangkan kegunaan pertama|Demonstrasi satu ciri dibekalkan|Perhatikan produk dari dekat
+Soalan lazim tentang kegunaan|Soalan lazim tentang ciri|Soalan lazim tentang sasaran|Soalan lazim sebelum membuat pilihan
+Salah faham tentang kategori|Jangan pilih berdasarkan rupa sahaja|Bezakan fakta dengan andaian|Apa yang perlu diketahui dahulu
+Sebab orang mungkin ragu|Maklumat untuk pembeli berhati-hati|Jawab keraguan tentang kesesuaian|Semak sebelum membuat keputusan
+Pilihan untuk rutin sibuk|Pilihan untuk pengguna baru|Pilihan berdasarkan keutamaan|Pilihan mengikut situasi penggunaan
+Sebelum kenal produk ini|Selepas faham ciri produk|Dari keliru kepada lebih jelas|Dari mencari kepada mempertimbangkan
+Cerita masalah dalam satu situasi|Cerita penemuan produk|Cerita semasa meneliti detail|Cerita keputusan berdasarkan fakta
+Kawan bertanya tentang produk|Perbualan tentang satu keperluan|Cadangan yang sesuai dengan sasaran|Bincang pilihan tanpa memaksa
+Detail bentuk dan rupa|Detail bahan yang dibekalkan|Detail saiz yang dibekalkan|Detail pembungkusan yang dibekalkan
+Keutamaan fungsi|Keutamaan keselesaan jika dinyatakan|Keutamaan kemudahan jika dinyatakan|Keutamaan gaya dan penampilan
+Produk untuk kegunaan sendiri|Produk sebagai pilihan hadiah|Produk dalam ruang penggunaan|Produk dalam perjalanan jika sesuai
+Tiga perkara untuk disemak|Satu perkara yang mudah terlepas|Perkara paling penting bagi sasaran|Susun keutamaan sebelum memilih
+Hook soalan yang dekat dengan pengguna|Hook situasi yang mudah dikenali|Hook detail yang mencetuskan ingin tahu|Hook pilihan yang membuat orang berfikir
+Fokus satu masalah pelanggan|Fokus satu matlamat pelanggan|Fokus satu kekangan pelanggan|Fokus satu pertimbangan pelanggan
+Apa produk ini sebenarnya|Siapa sasaran produk ini|Untuk situasi apa produk ini|Apa maklumat produk yang tersedia
+Bandingkan dua keutamaan pengguna|Bandingkan ciri dengan keperluan|Bandingkan jangkaan dengan fakta|Bandingkan dua situasi penggunaan
+Perkenalan produk secara santai|Penerangan produk secara terus|Penerangan melalui satu soalan|Penerangan melalui satu pemerhatian
+Pemerhatian semasa memegang produk|Pemerhatian sebelum memilih produk|Pemerhatian pada satu detail visual|Pemerhatian pada maklumat yang dibekalkan
+Ajakan semak maklumat lengkap|Ajakan pertimbangkan ikut keperluan|Ajakan bertanya tentang produk|Ajakan simpan untuk rujukan
+Sudut pengguna yang suka meneliti|Sudut pengguna yang mahu ringkas|Sudut pengguna yang masih mencari|Sudut pengguna yang membanding pilihan
+Kenapa satu ciri penting pada sasaran|Bagaimana kegunaan berkait dengan rutin|Bagaimana masalah berkait dengan pilihan|Bagaimana manfaat berkait dengan matlamat
+Kesilapan memilih tanpa semakan|Kesilapan mengabaikan sasaran kegunaan|Kesilapan menyamakan semua produk|Kesilapan membuat andaian tentang manfaat
+Ringkasan ciri dan kegunaan|Ringkasan masalah dan pilihan|Ringkasan kesesuaian untuk sasaran|Ringkasan sebelum langkah seterusnya
+`.trim().split(/[|\n]/).map(title=>title.trim());
+      const marketingAngleAssignments=new Map();
+      const MARKETING_ANGLE_KEY='planny-marketing-angles-120-v1';
+      try {
+        const saved=JSON.parse(localStorage.getItem(MARKETING_ANGLE_KEY)||'{}');
+        for(const [key,order] of Object.entries(saved))if(Array.isArray(order)&&order.length===120&&new Set(order).size===120&&order.every(n=>Number.isInteger(n)&&n>=0&&n<120))marketingAngleAssignments.set(key,order);
+      } catch(_) {}
+      function marketingAnglesFor(product){
+        const key=JSON.stringify(['product','price','target','benefit','problem','appearance','features','useCases','goal'].map(k=>String(product[k]||'').trim()));
+        if(!marketingAngleAssignments.has(key)){
+          const seed=new Uint32Array(1);crypto.getRandomValues(seed);
+          marketingAngleAssignments.set(key,shuffled(Array.from({length:120},(_,i)=>i),seededRandom(seed[0])));
+          try{localStorage.setItem(MARKETING_ANGLE_KEY,JSON.stringify(Object.fromEntries(marketingAngleAssignments)));}catch(_){}
+        }
+        return marketingAngleAssignments.get(key).map(id=>({id:id+1,title:MARKETING_ANGLES_120[id],direction:MARKETING_ANGLES_120[id]+'. Jadikan sudut ini premis utama cerita, khusus untuk produk dan sasaran yang diberikan. Gunakan fakta dibekalkan sahaja; jika sudut memerlukan fakta yang tiada atau tidak relevan, bincangkan perkara untuk disemak tanpa mereka fakta, kegunaan, pengalaman atau hasil.'}));
+      }
+      function aiMarketingContext(product,index,context){
+        const angle=marketingAnglesFor(product)[index];
+        const flow=angle.direction+' Hook mengikut angle → fakta produk yang relevan → pertimbangan → CTA mengikut matlamat.';
+        return {...context,angle:angle.title,flow,marketingAngleId:angle.id,parts:context.parts.map(part=>({...part,
+          scene:angle.direction+' '+part.scene,
+          image:part.image ? 'MARKETING ANGLE: '+angle.direction+'\n\n'+part.image.replaceAll('Angle: '+context.angle,'Angle: '+angle.title) : '',
+          video:part.video ? 'MARKETING ANGLE: '+angle.direction+'\n\n'+part.video.replaceAll('Angle: '+context.angle,'Angle: '+angle.title) : ''
+        }))};
+      }
       function makeIdea(index) {
         const p = state.product;
         const seed = hash([p.product,p.target,p.benefit,p.problem,index].join('|'));
@@ -824,8 +881,8 @@ body.simple-products{background:#fff}.simple-products .app{width:min(calc(100% -
         return {
           id: index,
           hook: fill(hookBank[hi], p),
-          angle: angleBank[ai][0],
-          angleDesc: angleBank[ai][1],
+          angle: marketingAnglesFor(p)[index].title,
+          angleDesc: marketingAnglesFor(p)[index].direction,
           structure: structureBank[si],
           cta: ctaBank[ci],
           style: STYLES[sti],
@@ -2442,11 +2499,11 @@ body.simple-products{background:#fff}.simple-products .app{width:min(calc(100% -
         return data;
       }
       async function aiGenerateProduct(product,opts,engine){
-        const key=JSON.stringify({version:8,product,opts,engine});
+        const key=JSON.stringify({version:9,product,opts,engine});
         let record=await aiRead(key);
         if(!record?.latest){
           const ideas=Array.from({length:120},(_,index)=>{
-            const context={...aiBaseExpanded(product,Math.floor(index/4),index%4,engine,opts),engine,variationId:index+1};
+            const context=aiMarketingContext(product,index,{...aiBaseExpanded(product,Math.floor(index/4),index%4,engine,opts),engine,variationId:index+1});
             return {...aiFill(context,context.parts.map(()=> 'Dialog AI belum dijana.'),'pending'),__context:context};
           });
           record={latest:{ideas,product,options:opts,engine}};await aiWrite(key,record);
@@ -2540,7 +2597,7 @@ body.simple-products{background:#fff}.simple-products .app{width:min(calc(100% -
       };
       const creatorRender=renderDay,creatorAttempted=new Set();
       function creatorContexts(day){return Array.from({length:4},(_,j)=>{
-        const idea=makeIdea(day*4+j);return {variationId:idea.id+1,day:day+1,slot:j+1,flow:idea.structure,angle:idea.angle,style:idea.style,duration:32,engine:state.product.platform,parts:Array.from({length:4},(_,p)=>({stage:p===0?'Hook':p===3?'CTA':'Detail',scene:idea.structure+' '+idea.visual+' Part '+(p+1)}))};
+        const idea=makeIdea(day*4+j);return aiMarketingContext(state.product,day*4+j,{variationId:idea.id+1,day:day+1,slot:j+1,flow:idea.structure,angle:idea.angle,style:idea.style,duration:32,engine:state.product.platform,parts:Array.from({length:4},(_,p)=>({stage:p===0?'Hook':p===3?'CTA':'Detail',scene:idea.structure+' '+idea.visual+' Part '+(p+1)}))});
       });}
       async function creatorGenerate(product,contexts,regenerate=false){
         if(JSON.stringify(state.product)!==JSON.stringify(product))return;
