@@ -3,7 +3,9 @@ export const digest = value => createHash('sha256').update(JSON.stringify(value)
 export const modelName = () => process.env.OPENAI_MODEL?.trim() || 'gpt-6-luna';
 export const effort = () => process.env.OPENAI_REASONING_EFFORT?.trim() || 'none';
 export async function redis(...command) {
-  const url=process.env.UPSTASH_REDIS_REST_URL, token=process.env.UPSTASH_REDIS_REST_TOKEN;
+  // Vercel's Upstash integration injects KV_REST_API_* variables.
+  const url=process.env.UPSTASH_REDIS_REST_URL?.trim() || process.env.KV_REST_API_URL?.trim();
+  const token=process.env.UPSTASH_REDIS_REST_TOKEN?.trim() || process.env.KV_REST_API_TOKEN?.trim();
   if(!url||!token) throw Error('DATABASE_NOT_CONFIGURED');
   const response=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(command),signal:AbortSignal.timeout(1500)});
   if(!response.ok) throw Error('DATABASE_UNAVAILABLE');
