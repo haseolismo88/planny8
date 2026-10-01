@@ -56,9 +56,9 @@ test('real official SDK serializes the Responses API request and parses its resp
 });
 
 const makeLine=(n,id=1)=>Array.from({length:n},(_,i)=>i===0?'idea'+id:'kata'+i).join(' ');
-test('accept 17–20 words and reject 16/21, nonstrings and exact duplicates',()=>{
+test('accept 15–23 words and reject 14/24, nonstrings and exact duplicates',()=>{
  const input=validate(body);
- for(const n of [16,17,18,19,20,21])assert.equal(checkOutput({ideas:[{id:1,dialogues:[makeLine(n)]}]},input)===null,n>=17&&n<=20);
+ for(const n of [14,15,16,17,18,19,20,21,22,23,24])assert.equal(checkOutput({ideas:[{id:1,dialogues:[makeLine(n)]}]},input)===null,n>=15&&n<=23);
  for(const value of [null,{},17])assert.ok(checkOutput({ideas:[{id:1,dialogues:[value]}]},input));
  const two=validate({...body,ideas:[{...body.ideas[0],duration:16,parts:[...body.ideas[0].parts,...body.ideas[0].parts]}]});
  assert.ok(checkOutput({ideas:[{id:1,dialogues:[makeLine(17),makeLine(17).toUpperCase()+'!']}]},two));
